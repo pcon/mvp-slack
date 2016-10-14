@@ -38,7 +38,7 @@ function getInstanceInfo(instance) {
             res.on('end', function () {
                 parsed_data = JSON.parse(data);
 
-                if (parsed_data.key === undefined || parsed_data.key !== instance.toUppserCase()) {
+                if (parsed_data.key === undefined || parsed_data.key !== instance.toUpperCase()) {
                     deferred.reject(new Error('Unknown instance'));
                 } else {
                     deferred.resolve(parsed_data);
