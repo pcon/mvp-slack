@@ -52,6 +52,34 @@ function getInstanceInfo(instance) {
     return deferred.promise;
 }
 
+function getInstanceAlias(instance) {
+    'use strict';
+
+    var parsed_data,
+        deferred = Q.defer(),
+        data = '',
+        url = 'https://api.status.salesforce.com/v1/instanceAliases/' + instance;
+
+    https.get(url, function (res) {
+        if (res.statusCode !== 200) {
+            deferred.reject(new Error(res.statusCode));
+        } else {
+            res.on('data', function (d) {
+                data += d;
+            });
+
+            res.on('end', function () {
+                parsed_data = JSON.parse(data);
+                deferred.resolve(parsed_data);
+            });
+        }
+    }).on('error', function (e) {
+        deferred.reject(e);
+    });
+
+    return deferred.promise;
+}
+
 module.exports = function (robot) {
     'use strict';
 
@@ -109,6 +137,17 @@ module.exports = function (robot) {
                 robot.adapter.customMessage(msg_data);
             }).fail(function () {
                 msg.reply('Unknown instance "' + match + '"');
+            });
+    });
+
+    robot.respond(/alias ([A-Za-z0-9\.\-]+)$/i, function (msg) {
+        var match = msg.match[1];
+
+        getInstanceAlias(match)
+            .then(function (data) {
+                msg.reply(match + ' runs on ' + data.instanceKey);
+            }).fail(function (e) {
+                console.log(e);
             });
     });
 };
