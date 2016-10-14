@@ -1,6 +1,3 @@
-/*jslint browser: true, regexp: true */
-/*global module, require */
-
 // Description:
 //   Checks the salesforce trust site and alerts a channel if there is a service interruption
 //
@@ -11,10 +8,15 @@
 //   HUBOT_SFDCTRUST_CHANNELS - A comma separated list of channels to announce to
 //
 // Commands:
-//   status <instance>
+//   hubot status <instance> - Gets the status
+//   hubot version <instance> - Gets the version information
+//   hubot alias <name> - Gets the instance name for the given alias
 //
 // Author:
 //   pcon
+
+/*jslint browser: true, regexp: true */
+/*global module, require */
 
 var https = require('https');
 var Q = require('q');
