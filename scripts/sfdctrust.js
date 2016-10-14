@@ -22,19 +22,29 @@ var Q = require('q');
 function getInstanceInfo(instance) {
     'use strict';
 
-    var deferred = Q.defer(),
+    var parsed_data,
+        deferred = Q.defer(),
         data = '',
         url = 'https://api.status.salesforce.com/v1/instances/' + instance.toUpperCase() + '/status';
 
     https.get(url, function (res) {
-        res.on('data', function (d) {
-            data += d;
-        });
+        if (res.statusCode !== 200) {
+            deferred.reject(new Error(res.statusCode));
+        } else {
+            res.on('data', function (d) {
+                data += d;
+            });
 
-        res.on('end', function () {
-            deferred.resolve(JSON.parse(data));
-        });
+            res.on('end', function () {
+                parsed_data = JSON.parse(data);
 
+                if (parsed_data.key === undefined || parsed_data.key !== instance.toUppserCase()) {
+                    deferred.reject(new Error('Unknown instance'));
+                } else {
+                    deferred.resolve(parsed_data);
+                }
+            });
+        }
     }).on('error', function (e) {
         deferred.reject(e);
     });
@@ -46,34 +56,59 @@ module.exports = function (robot) {
     'use strict';
 
     robot.respond(/status ([A-Za-z0-9]+)$/i, function (msg) {
-        var match = msg.match[1];
+        var attachment, msg_data,
+            match = msg.match[1];
 
         getInstanceInfo(match)
             .then(function (data) {
-                msg.reply('Wat? ' + data.environment);
+                attachment = {
+                    title: data.key + ' status',
+                    title_link: 'https://status.salesforce.com/status/' + data.key
+                };
+
+                if (data.Incidents.length === 0) {
+                    attachment.fallback = 'No incidents reported';
+                    attachment.thumb_url = 'https://trust.salesforce.com/static/images/user_guide/Healthy@2x.png';
+                    attachment.text = 'No incidents reported';
+                }
+
+                msg_data = {
+                    attachments: [attachment],
+                    channel: msg.message.room
+                };
+
+                robot.adapter.customMessage(msg_data);
+            }).fail(function () {
+                msg.reply('Unknown instance "' + match + '"');
             });
     });
 
     robot.respond(/version ([A-Za-z0-9]+)$/i, function (msg) {
-        var match = msg.match[1],
-            attachment = {},
-            msg_data;
+        var attachment, msg_data,
+            match = msg.match[1];
 
         getInstanceInfo(match)
             .then(function (data) {
-                attachment.title = data.key + ' version information';
-                attachment.title_link = 'https://status.salesforce.com/status/' + data.key;
-                attachment.fields = [
-                    {
-                        "title": "Release Version",
-                        "value": data.releaseVersion,
-                        "short": false
-                    }
-                ];
+                attachment = {
+                    title: data.key + ' version information',
+                    title_link: 'https://status.salesforce.com/status/' + data.key,
+                    fields: [
+                        {
+                            "title": "Release Version",
+                            "value": data.releaseVersion,
+                            "short": false
+                        }
+                    ]
+                };
 
-                msg_data = {attachments: [attachment], channel: msg.message.room};
+                msg_data = {
+                    attachments: [attachment],
+                    channel: msg.message.room
+                };
 
                 robot.adapter.customMessage(msg_data);
+            }).fail(function () {
+                msg.reply('Unknown instance "' + match + '"');
             });
     });
 };
