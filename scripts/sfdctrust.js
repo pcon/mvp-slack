@@ -56,7 +56,8 @@ module.exports = function (robot) {
 
     robot.respond(/version ([A-Za-z0-9]+)$/i, function (msg) {
         var match = msg.match[1],
-            attachment = {};
+            attachment = {},
+            msg_data;
 
         getInstanceInfo(match)
             .then(function (data) {
@@ -70,7 +71,9 @@ module.exports = function (robot) {
                     }
                 ];
 
-                msg.send({attachments: [attachment], username: msg.robot.name, as_user: true, channel: msg.envelope.room});
+                msg_data = {attachments: [attachment], channel: msg.message.room};
+
+                robot.adapter.customMessage(msg_data);
             });
     });
 };
