@@ -70,7 +70,7 @@ module.exports = function (robot) {
                     }
                 ];
 
-                msg.send({attachments: [attachment], username: msg.robot.name, as_user: true});
+                msg.send({attachments: [attachment], username: msg.robot.name, as_user: true, channel: msg.envelope.room});
             });
     });
 };
