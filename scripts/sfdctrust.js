@@ -16,18 +16,39 @@
 //   pcon
 
 /*jslint browser: true, regexp: true */
-/*global module, require */
+/*global module, require, console */
 
 var https = require('https');
 var Q = require('q');
+var lo = require('lodash');
+var moment = require('moment');
+var quiche = require('quiche');
 
-function getInstanceInfo(instance) {
+var STATUS_IMAGE_MAP = {
+    'Healthy': 'https://trust.salesforce.com/static/images/user_guide/Healthy@2x.png',
+    'Maintenance': 'https://trust.salesforce.com/static/images/user_guide/Maintenance@2x.png',
+    'Disruption': 'https://trust.salesforce.com/static/images/user_guide/Disruption@2x.png',
+    'Degradation': 'https://trust.salesforce.com/static/images/user_guide/Degradation@2x.png',
+    'Healthy_Disruption': 'https://trust.salesforce.com/static/images/user_guide/Healthy_Disruption@2x.png',
+    'Healthy_Degradation': 'https://trust.salesforce.com/static/images/user_guide/Healthy_Degradation@2x.png',
+    'Healthy_Maintenance': 'https://trust.salesforce.com/static/images/user_guide/Healthy_Maintenance@2x.png'
+};
+
+var CHART_TITLE_MAP = {
+    'TransactionCount': 'Daily Transaction Count',
+    'AvgTransactionSpeed': 'Daily Average Transactions Time'
+};
+
+var CHART_SCALE_MAP = {
+    'TransactionCount': 1000000000.0,
+    'AvgTransactionSpeed': 1
+};
+
+function getData(url) {
     'use strict';
 
-    var parsed_data,
-        deferred = Q.defer(),
-        data = '',
-        url = 'https://api.status.salesforce.com/v1/instances/' + instance.toUpperCase() + '/status';
+    var data = '',
+        deferred = Q.defer();
 
     https.get(url, function (res) {
         if (res.statusCode !== 200) {
@@ -38,18 +59,32 @@ function getInstanceInfo(instance) {
             });
 
             res.on('end', function () {
-                parsed_data = JSON.parse(data);
-
-                if (parsed_data.key === undefined || parsed_data.key !== instance.toUpperCase()) {
-                    deferred.reject(new Error('Unknown instance'));
-                } else {
-                    deferred.resolve(parsed_data);
-                }
+                deferred.resolve(JSON.parse(data));
             });
         }
     }).on('error', function (e) {
         deferred.reject(e);
     });
+
+    return deferred.promise;
+}
+
+function getInstanceInfo(instance) {
+    'use strict';
+
+    var url = 'https://api.status.salesforce.com/v1/instances/' + instance.toUpperCase() + '/status',
+        deferred = Q.defer();
+
+    getData(url)
+        .then(function (data) {
+            if (data.key === undefined || data.key !== instance.toUpperCase()) {
+                deferred.reject(new Error('Unknown instance'));
+            } else {
+                deferred.resolve(data);
+            }
+        }).fail(function (e) {
+            deferred.reject(e);
+        });
 
     return deferred.promise;
 }
@@ -57,36 +92,24 @@ function getInstanceInfo(instance) {
 function getInstanceAlias(instance) {
     'use strict';
 
-    var parsed_data,
-        deferred = Q.defer(),
-        data = '',
-        url = 'https://api.status.salesforce.com/v1/instanceAliases/' + instance;
+    var url = 'https://api.status.salesforce.com/v1/instanceAliases/' + instance;
 
-    https.get(url, function (res) {
-        if (res.statusCode !== 200) {
-            deferred.reject(new Error(res.statusCode));
-        } else {
-            res.on('data', function (d) {
-                data += d;
-            });
+    return getData(url);
+}
 
-            res.on('end', function () {
-                parsed_data = JSON.parse(data);
-                deferred.resolve(parsed_data);
-            });
-        }
-    }).on('error', function (e) {
-        deferred.reject(e);
-    });
+function getMetricValues() {
+    'use strict';
 
-    return deferred.promise;
+    var url = 'https://api.status.salesforce.com/v1/metricValues';
+
+    return getData(url);
 }
 
 module.exports = function (robot) {
     'use strict';
 
     robot.respond(/status ([A-Za-z0-9]+)$/i, function (msg) {
-        var attachment, msg_data,
+        var attachment, msg_data, stat, incident, maint, m_start, m_end,
             match = msg.match[1];
 
         getInstanceInfo(match)
@@ -96,11 +119,49 @@ module.exports = function (robot) {
                     title_link: 'https://status.salesforce.com/status/' + data.key
                 };
 
-                if (data.Incidents.length === 0) {
-                    attachment.fallback = 'No incidents reported';
-                    attachment.thumb_url = 'https://trust.salesforce.com/static/images/user_guide/Healthy@2x.png';
-                    attachment.text = 'No incidents reported';
+                stat = 'Healthy';
+
+                if (data.Incidents.length !== 0) {
+                    incident = lo.last(data.Incidents);
+                    m_start = moment(incident.IncidentImacts[0].startTime);
+                    m_end = moment(incident.IncidentImpacts[0].endTime);
+
+                    if (m_end.isSameOrAfter(moment())) {
+                        if (incident.IncidentImpacts[0].type === 'performanceDegradation') {
+                            stat = 'Degradation';
+                        } else {
+                            stat = 'Disruption';
+                        }
+                    }
+
+                    attachment.fallback = stat + ' - ' + incident.message.rootCause;
+                    attachment.text = incident.message.rootCause;
+                    attachment.footer = 'Last updated ' + moment(incident.updatedAt).fromNow();
+                } else if (data.Maintenances.length !== 0) {
+                    maint = lo.first(data.Maintenances);
+                    m_start = moment(maint.plannedStartTime);
+                    m_end = moment(maint.plannedEndTime);
+
+                    if (m_end.isSameOrAfter(moment()) && m_start.isSameOrBefore(moment())) {
+                        if (maint.message.availability === 'unavailable') {
+                            stat = 'Maintenance';
+                        } else {
+                            stat = 'Healthy_Maintenance';
+                        }
+                    }
+
+                    attachment.fallback = stat + ' - ' + maint.name;
+                    attachment.text = maint.name;
+                    attachment.footer = 'Last updated ' + moment(maint.updatedAt).fromNow();
                 }
+
+                if (stat === 'Healthy') {
+                    attachment.fallback = 'No incidents reported';
+                    attachment.text = 'No incidents reported';
+                    delete attachment.footer;
+                }
+
+                attachment.thumb_url = STATUS_IMAGE_MAP[stat];
 
                 msg_data = {
                     attachments: [attachment],
@@ -148,6 +209,68 @@ module.exports = function (robot) {
         getInstanceAlias(match)
             .then(function (data) {
                 msg.reply(match + ' runs on ' + data.instanceKey);
+            }).fail(function (e) {
+                console.log(e);
+            });
+    });
+
+    robot.respond(/metrics$/i, function (msg) {
+        var chart, image_data, msg_data,
+            image_data_list = [],
+            sorted_data = {};
+
+        getMetricValues()
+            .then(function (data) {
+                lo.each(data, function (row) {
+                    if (!lo.has(sorted_data, row.metricValueName)) {
+                        sorted_data[row.metricValueName] = [];
+                    }
+
+                    sorted_data[row.metricValueName].push(row);
+                });
+
+                lo.each(lo.keys(sorted_data), function (key) {
+                    sorted_data[key] = lo.sortBy(sorted_data[key], 'timestamp');
+                    image_data = {
+                        name: key,
+                        title: CHART_TITLE_MAP[key],
+                        data: [],
+                        labels: []
+                    };
+
+                    lo.each(lo.takeRight(sorted_data[key], 30), function (row) {
+                        image_data.data.push(row.value / CHART_SCALE_MAP[key]);
+                        image_data.labels.push(moment(row.timestamp).format('YYYY-MM-DD'));
+                    });
+
+                    chart = quiche('line');
+                    chart.setTitle(image_data.title);
+                    chart.addData(image_data.data, 'All Instances', '0000cc');
+                    chart.setAutoScaling();
+                    chart.setTransparentBackground();
+                    chart.setLegendTop();
+                    chart.setHeight(250);
+                    chart.setWidth(400);
+                    image_data.url = chart.getUrl(true);
+
+                    image_data_list.push(image_data);
+                });
+
+                msg_data = {
+                    attachments: [],
+                    channel: msg.message.room
+                };
+
+                lo.each(image_data_list, function (image_data) {
+                    msg_data.attachments.push({
+                        title: image_data.title,
+                        title_link: 'https://status.salesforce.com/performance',
+                        image_url: image_data.url
+                    });
+                });
+
+                robot.adapter.customMessage(msg_data);
+
             }).fail(function (e) {
                 console.log(e);
             });
