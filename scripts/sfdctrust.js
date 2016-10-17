@@ -44,6 +44,11 @@ var CHART_SCALE_MAP = {
     'AvgTransactionSpeed': 1
 };
 
+var CHART_LABEL_MAP = {
+    'TransactionCount': 'All Instances (in Billions)',
+    'AvgTransactionSpeed': 'All Instances (in ms)'
+};
+
 function getData(url) {
     'use strict';
 
@@ -245,7 +250,7 @@ module.exports = function (robot) {
 
                     chart = quiche('line');
                     chart.setTitle(image_data.title);
-                    chart.addData(image_data.data, 'All Instances', '0000cc');
+                    chart.addData(image_data.data, CHART_LABEL_MAP[key], '0000cc');
                     chart.setAutoScaling();
                     chart.setTransparentBackground();
                     chart.setLegendTop();
