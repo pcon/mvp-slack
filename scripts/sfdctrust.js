@@ -114,7 +114,7 @@ module.exports = function (robot) {
     'use strict';
 
     robot.respond(/status ([A-Za-z0-9]+)$/i, function (msg) {
-        var attachment, msg_data, stat, incident, maint, m_start, m_end,
+        var attachment, msg_data, stat, incident, impact, maint, m_start, m_end,
             match = msg.match[1];
 
         getInstanceInfo(match)
@@ -128,8 +128,9 @@ module.exports = function (robot) {
 
                 if (!lo.isEmpty(data.Incidents)) {
                     incident = lo.last(data.Incidents);
-                    m_start = moment(lo.first(incident.IncidentImpacts).startTime);
-                    m_end = moment(lo.first(incident.IncidentImpacts).endTime);
+                    impact = lo.first(incident.IncidentImpacts);
+                    m_start = moment(impact.startTime);
+                    m_end = (impact.endTime === null) ? moment() : moment(impact.endTime);
 
                     if (m_end.isSameOrAfter(moment())) {
                         if (incident.IncidentImpacts[0].type === 'performanceDegradation') {
