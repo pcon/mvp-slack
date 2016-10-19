@@ -144,7 +144,7 @@ module.exports = function (robot) {
                     attachment.text = (incident.message.rootCause !== null) ? incident.message.rootCause : lo.upperFirst(impact.severity) + ' ' + stat;
                     attachment.footer = 'Last updated ' + moment(incident.updatedAt).fromNow();
 
-                    if (!lo.isEmpty(incident.serviceKeys)) {
+                    if (!lo.isEmpty(incident.serviceKeys) && stat !== 'Healthy') {
                         attachment.fields = [
                             {
                                 title: "Services",
