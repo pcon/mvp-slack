@@ -126,10 +126,10 @@ module.exports = function (robot) {
 
                 stat = 'Healthy';
 
-                if (data.Incidents.length !== 0) {
+                if (!lo.isEmpty(data.Incidents)) {
                     incident = lo.last(data.Incidents);
-                    m_start = moment(incident.IncidentImacts[0].startTime);
-                    m_end = moment(incident.IncidentImpacts[0].endTime);
+                    m_start = moment(lo.first(incident.IncidentImpacts).startTime);
+                    m_end = moment(lo.first(incident.IncidentImpacts).endTime);
 
                     if (m_end.isSameOrAfter(moment())) {
                         if (incident.IncidentImpacts[0].type === 'performanceDegradation') {
@@ -142,7 +142,7 @@ module.exports = function (robot) {
                     attachment.fallback = stat + ' - ' + incident.message.rootCause;
                     attachment.text = incident.message.rootCause;
                     attachment.footer = 'Last updated ' + moment(incident.updatedAt).fromNow();
-                } else if (data.Maintenances.length !== 0) {
+                } else if (!lo.isEmpty(data.Maintenances)) {
                     maint = lo.first(data.Maintenances);
                     m_start = moment(maint.plannedStartTime);
                     m_end = moment(maint.plannedEndTime);
