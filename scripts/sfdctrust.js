@@ -141,8 +141,18 @@ module.exports = function (robot) {
                     }
 
                     attachment.fallback = stat + ' - ' + incident.message.rootCause;
-                    attachment.text = incident.message.rootCause;
+                    attachment.text = (incident.message.rootCause !== null) ? incident.message.rootCause : impact.severity + ' ' + impact.type;
                     attachment.footer = 'Last updated ' + moment(incident.updatedAt).fromNow();
+
+                    if (!lo.isEmpty(incident.serviceKeys)) {
+                        attachment.fields = [
+                            {
+                                title: "Services",
+                                value: lo.join(incident.serviceKeys),
+                                short: false
+                            }
+                        ];
+                    }
                 } else if (!lo.isEmpty(data.Maintenances)) {
                     maint = lo.first(data.Maintenances);
                     m_start = moment(maint.plannedStartTime);
