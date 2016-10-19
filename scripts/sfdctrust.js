@@ -141,7 +141,7 @@ module.exports = function (robot) {
                     }
 
                     attachment.fallback = stat + ' - ' + incident.message.rootCause;
-                    attachment.text = (incident.message.rootCause !== null) ? incident.message.rootCause : impact.severity + ' ' + impact.type;
+                    attachment.text = (incident.message.rootCause !== null) ? incident.message.rootCause : lo.upperFirst(impact.severity) + ' ' + stat;
                     attachment.footer = 'Last updated ' + moment(incident.updatedAt).fromNow();
 
                     if (!lo.isEmpty(incident.serviceKeys)) {
