@@ -22,10 +22,7 @@
         "hubot-scripts": "^2.16.2",
         "hubot-shipit": "^0.2.0",
         "hubot-slack": "^3.4.1",
-        "lodash": "4.16.4",
-        "moment": "2.15.1",
-        "q": "1.4.1",
-        "quiche": "0.1.0"
+        "hubot-salesforce-slack": "1.0.0"
     },
 
     "engines": {

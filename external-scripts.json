@@ -9,5 +9,6 @@
   "hubot-quote-database",
   "hubot-redis-brain",
   "hubot-rules",
-  "hubot-shipit"
+  "hubot-shipit",
+  "hubot-salesforce-slack"
 ]
